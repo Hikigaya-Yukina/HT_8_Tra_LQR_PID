@@ -60,14 +60,14 @@ vector<MatrixXd> stateSpace(float ref_yaw, float dt , float v){
 
 }
 
-vector<MatrixXd> getQR(float q, float r){
+vector<MatrixXd> getQR(float q1, float q2, float q3, float r1, float r2){
     MatrixXd Q(3,3);
     MatrixXd R(2,2);
-    Q<<q,0,0,
-        0,q,0,
-        0,0,q;
-    R<<r,0,
-        0,r;
+    Q<<q1,0,0,
+        0,q2,0,
+        0,0,q3;
+    R<<r1,0,
+        0,r2;
     return {Q,R};
 }
 
