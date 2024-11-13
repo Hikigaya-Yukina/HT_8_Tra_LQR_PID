@@ -170,16 +170,16 @@ int main(int argc, char *argv[])
             float theta;
 
             //在追踪首个点时怎么走
-            if(i == 0){
+            // if(i == 0){
             theta = atan2(First_node.pose.position.y - Scout_chassis.Robot_pose.position.y, 
             First_node.pose.position.x - Scout_chassis.Robot_pose.position.x);
             theta = angle_normalized(theta);
-            }
-            else{
-                theta = atan2(First_node.pose.position.y - Path_nodes.poses[i-1].pose.position.y, 
-                First_node.pose.position.x - Path_nodes.poses[i-1].pose.position.x);
-                theta = angle_normalized(theta);
-            }
+            // }
+            // else{
+            //     theta = atan2(First_node.pose.position.y - Path_nodes.poses[i-1].pose.position.y, 
+            //     First_node.pose.position.x - Path_nodes.poses[i-1].pose.position.x);
+            //     theta = angle_normalized(theta);
+            // }
 
             
             //获取参考速度和参考角度
@@ -191,7 +191,7 @@ int main(int argc, char *argv[])
             vector<MatrixXd>A_B = robot_motion_LQR.stateSpace(ref_angle, dt, line_vel);
             
             //获取Q，R矩阵
-            vector<MatrixXd>Q_R = robot_motion_LQR.getQR(8,8,4,0.5,0.5);
+            vector<MatrixXd>Q_R = robot_motion_LQR.getQR(20,20,1,1,1);
 
             //获取角速度指令
             vector<double>state = {Scout_chassis.Robot_pose.position.x, Scout_chassis.Robot_pose.position.y, model_yaw};
@@ -227,7 +227,7 @@ int main(int argc, char *argv[])
                 pre_a = pid(pid_n2, dt, Vtar, Scout_chassis.Robot_velocity.linear.x, vel_error);
             }
             
-            float pre_aa = pid(pid_n2, dt, pre_avel*10, Scout_chassis.Robot_velocity.angular.z, angvel_error);
+            float pre_aa = pid(pid_n2, dt, pre_avel, Scout_chassis.Robot_velocity.angular.z, angvel_error);
 
             if(pre_a > Scout_chassis.acc_max)
             {
@@ -310,7 +310,7 @@ int main(int argc, char *argv[])
             passed_by_pub.publish(passed_by);
             path_pub.publish(Path_nodes);
             //进入最近地图点多少米之后(0.1m)，目标设定为下一个点。
-            if(distance < 0.2 && i <((path_length-1)*5)+1) i++;
+            if(distance < 0.5 && i <((path_length-1)*5)+1) i++;
             else if(distance < 0.05 && i == (path_length-1)*5 +1) i++;
         }
         loop_rate.sleep();
