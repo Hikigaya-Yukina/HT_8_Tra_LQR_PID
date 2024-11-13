@@ -1,0 +1,5 @@
+<launch>
+    <node pkg="controllors_pkg" type="controllors_pkg_node" name="scout_ctrl"  output="screen">
+
+    </node>
+</launch>
