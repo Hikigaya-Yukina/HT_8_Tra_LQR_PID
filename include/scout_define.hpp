@@ -16,7 +16,7 @@ public:
     float acc_max = 50;
 
     //定义 目标最大速度
-    float Vtar = 1.2;
+    float Vtar = 1;
 
     const double SCOUT_WHEELBASE = 0.498;
     const double SCOUT_WHEEL_RADIUS = 0.16459;

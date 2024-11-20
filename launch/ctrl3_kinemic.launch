@@ -1,5 +1,0 @@
-<launch>
-    <node pkg="controllors_pkg" type="controllors_pkg_node_2" name="scout_ctrl_2_kinemic"  output="screen">
-
-    </node>
-</launch>

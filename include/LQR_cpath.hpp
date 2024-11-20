@@ -9,6 +9,19 @@ using namespace Eigen;
 
 constexpr double EPS = 1.0e-4;
 
+float angle_normalized(float angle)
+{
+    while (angle > M_PI)
+    {
+        angle -= 2 * M_PI;
+    }
+    while (angle < -M_PI)
+    {
+        angle += 2 * M_PI;
+    }
+    return angle;
+}
+
 class LQRControl{
 private:
     int N;     // 可能是迭代步长
@@ -34,17 +47,18 @@ public:
 
 
 
-    double lqrControl(vector<double>robot_state,vector<double>refer_path, MatrixXd A, MatrixXd B, MatrixXd Q, MatrixXd R){
+    void lqrControl(vector<double>robot_state,vector<double>refer_path, MatrixXd A, MatrixXd B, MatrixXd Q, MatrixXd R, double prevel[2]){
     MatrixXd X(3,1);
     X<< robot_state[0] - refer_path[0],
         robot_state[1] - refer_path[1],
-        robot_state[2] - refer_path[2];//  x是当前位置和预瞄点的偏差  x,y,yaw三个偏差
+        angle_normalized(robot_state[2] - refer_path[2]);//  x是当前位置和预瞄点的偏差  x,y,yaw三个偏差
 
     MatrixXd P = calRicatti(A,B,Q,R);    //   3*3
     
     MatrixXd K = (R+B.transpose()*P*B).inverse()*B.transpose()*P*A;  // 反馈增益 2*3
     MatrixXd u = -K*X;   // 2*1
-    return u(1,0);  // return delta_theta   角速度偏差值
+    prevel[0] = u(0,0);
+    prevel[1] = u(1,0);  // return delta_theta   角速度偏差值
 }
 
 vector<MatrixXd> stateSpace(float ref_yaw, float dt , float v){   
@@ -60,14 +74,14 @@ vector<MatrixXd> stateSpace(float ref_yaw, float dt , float v){
 
 }
 
-vector<MatrixXd> getQR(float q, float r){
+vector<MatrixXd> getQR(float q1, float q2, float q3, float r1, float r2){
     MatrixXd Q(3,3);
     MatrixXd R(2,2);
-    Q<<q,0,0,
-        0,q,0,
-        0,0,q;
-    R<<r,0,
-        0,r;
+    Q<<q1,0,0,
+        0,q2,0,
+        0,0,q3;
+    R<<r1,0,
+        0,r2;
     return {Q,R};
 }
 

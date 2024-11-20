@@ -27,7 +27,7 @@ float deg_max = 10.0/180.0 * M_PI;
 float deg_min = 3.0/360.0 * M_PI;
 float vel_error =0;
 float angvel_error =0;
-
+float g = 9.8;
 //定义迭代次数
 int N = 200;
 
@@ -57,6 +57,12 @@ void modelCallback(const gazebo_msgs::ModelStates::ConstPtr& msg)
 float angle_normalized(float angle);
 float getRadius(float x_0, float y_0, float x_1, float y_1, float theta, float yaw);
 float pid(float Pid_n[], float dt, float vel, float vel_state, float error_sum);
+int isGravityCompensation(double roll, double pitch, double yaw, double ref_yaw);
+bool isTurnModified(double yaw, double ref_yaw);
+bool isStuck();
+bool isFrictionCompensation();
+bool isrugged();
+bool isPlained();
 
 int main(int argc, char *argv[])
 {   
@@ -85,7 +91,7 @@ int main(int argc, char *argv[])
     while (ros::ok())
     {   
         ros::spinOnce();
-        // ROS_INFO("Path length 等于 %d", path_length);
+
         //定义 输出指令
         geometry_msgs::Twist cmd;
         cmd.linear.x = 0;
@@ -154,6 +160,13 @@ int main(int argc, char *argv[])
             double roll, pitch, model_yaw;
             m.getRPY(roll, pitch, model_yaw);
             model_yaw = angle_normalized(model_yaw);
+            roll = angle_normalized(roll);
+            pitch = angle_normalized(pitch);
+            //重力加速度分量
+            float g_x = -sin(pitch) * g;
+            float g_y = cos(pitch) * sin(roll) * g;
+
+            //步长时间
             float dt = Scout_chassis.dt;
 
             //发送的速度
@@ -207,7 +220,7 @@ int main(int argc, char *argv[])
             
             
             float Vtar;
-            if(distance < 0.3)
+            if(distance < 0.2)
             {
                 Vtar = Scout_chassis.Vtar/2;
             }
@@ -216,12 +229,11 @@ int main(int argc, char *argv[])
                 Vtar = Scout_chassis.Vtar;
             }
         
-            //用Pid更新角速度和线速度
+            //用Pid更新角速度和线速度 pitch 上坡是负的
             float pre_a;
-            if(abs(angdiff)>deg_max)
+            if(abs(angdiff)>deg_max && pitch > -0.25)//差不多15度
             {
                 pre_a = pid(pid_n, dt, 0, Scout_chassis.Robot_velocity.linear.x, vel_error);
-                // printf("toobig ");
             }
             else{
                 pre_a = pid(pid_n2, dt, Vtar, Scout_chassis.Robot_velocity.linear.x, vel_error);
@@ -286,8 +298,9 @@ int main(int argc, char *argv[])
             }
             
             ROS_INFO("速度%f 指令速度%f 加速度%f",line_vel,cmd_lvel,pre_a);
-            ROS_INFO("期待角速度%f 目前角速度%f 目前角加速度%f",pre_avel, ang_vel, pre_aa);
-            ROS_INFO("角度差%f 跟踪的路径点序号%d 距离目的点距离 %f", -ref_angle + model_yaw, i, distance);
+            ROS_INFO("期待角速度%f 角速度%f 角加速度%f",pre_avel, ang_vel, pre_aa);
+            ROS_INFO("角度差%f 路径序号%d 目的点距离 %f", -ref_angle + model_yaw, i, distance);
+            ROS_INFO("R:%f, P:%f, Y:%f",roll,pitch,model_yaw);
             ROS_INFO("路径长度%d ,原长度%d",path_length_o,path_length);
             // 发出指令
             cmd.linear.x = cmd_lvel;
@@ -310,8 +323,8 @@ int main(int argc, char *argv[])
             passed_by_pub.publish(passed_by);
             path_pub.publish(Path_nodes);
             //进入最近地图点多少米之后(0.1m)，目标设定为下一个点。
-            if(distance < 0.5 && i <((path_length-1)*5)+1) i++;
-            else if(distance < 0.05 && i == (path_length-1)*5 +1) i++;
+            if(distance < 0.1 && i <((path_length-1)*5)+1) i++;
+            else if(distance < 0.03 && i == (path_length-1)*5 +1) i++;
         }
         loop_rate.sleep();
         

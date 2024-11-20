@@ -25,5 +25,7 @@ include_directories(
 
 add_executable(controllors_pkg_node src/scout_ctrl.cpp)
 add_executable(controllors_pkg_node_2 src/scout_ctrl_2_kinemic.cpp)
+add_executable(controllors_pkg_node_3 src/scout_ctrl_2_kinemic_for_cpath.cpp)
 target_link_libraries(controllors_pkg_node ${catkin_LIBRARIES})
 target_link_libraries(controllors_pkg_node_2 ${catkin_LIBRARIES})
+target_link_libraries(controllors_pkg_node_3 ${catkin_LIBRARIES})

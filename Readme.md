@@ -42,3 +42,10 @@ scout_define.hpp
 scout_ctrl_2_kinemic.cpp
 ```
 
+```bash
+#这个是键盘
+rosrun teleop_twist_keyboard teleop_twist_keyboard.py
+```
+```bash
+export GAZEBO_MODEL_PATH=/home/yukina/A_Projects/A_HT_MTraMap/ht_MTraMap_for_planning_scout_ws/src/ht_terrain_MTraMap/model
+```
