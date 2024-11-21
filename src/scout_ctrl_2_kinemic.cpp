@@ -24,6 +24,7 @@ int path_length;
 int path_length_o = 0;
 //角度范围
 float deg_max = 10.0/180.0 * M_PI;
+float deg_max2= 60.0/180.0 * M_PI;
 float deg_min = 3.0/360.0 * M_PI;
 float vel_error =0;
 float angvel_error =0;
@@ -157,15 +158,17 @@ int main(int argc, char *argv[])
             tf::Quaternion q(Scout_chassis.Robot_pose.orientation.x, Scout_chassis.Robot_pose.orientation.y, 
             Scout_chassis.Robot_pose.orientation.z, Scout_chassis.Robot_pose.orientation.w);
             tf::Matrix3x3 m(q);
+            
+            // 计算baselink的位置 + l/2
+            tf::Vector3 v(Scout_chassis.SCOUT_WHEELBASE/2, 0, 0);
+            v = m * v;
+            //重新更改跟踪的位置
+            Scout_chassis.Robot_pose.position.x += v.getX();
+            Scout_chassis.Robot_pose.position.y += v.getY();
+            
             double roll, pitch, model_yaw;
             m.getRPY(roll, pitch, model_yaw);
-            model_yaw = angle_normalized(model_yaw);
-            roll = angle_normalized(roll);
             pitch = angle_normalized(pitch);
-            //重力加速度分量
-            float g_x = -sin(pitch) * g;
-            float g_y = cos(pitch) * sin(roll) * g;
-
             //步长时间
             float dt = Scout_chassis.dt;
 
@@ -183,18 +186,10 @@ int main(int argc, char *argv[])
             float theta;
 
             //在追踪首个点时怎么走
-            // if(i == 0){
             theta = atan2(First_node.pose.position.y - Scout_chassis.Robot_pose.position.y, 
             First_node.pose.position.x - Scout_chassis.Robot_pose.position.x);
             theta = angle_normalized(theta);
-            // }
-            // else{
-            //     theta = atan2(First_node.pose.position.y - Path_nodes.poses[i-1].pose.position.y, 
-            //     First_node.pose.position.x - Path_nodes.poses[i-1].pose.position.x);
-            //     theta = angle_normalized(theta);
-            // }
 
-            
             //获取参考速度和参考角度
             float ref_vel = Scout_chassis.Vtar;
             float ref_angle = theta;
@@ -231,16 +226,56 @@ int main(int argc, char *argv[])
         
             //用Pid更新角速度和线速度 pitch 上坡是负的
             float pre_a;
-            if(abs(angdiff)>deg_max && pitch > -0.25)//差不多15度
-            {
-                pre_a = pid(pid_n, dt, 0, Scout_chassis.Robot_velocity.linear.x, vel_error);
-            }
-            else{
-                pre_a = pid(pid_n2, dt, Vtar, Scout_chassis.Robot_velocity.linear.x, vel_error);
-            }
+            float pre_aa;
+            double v_input;
+            float pitch_limit = - 0.175; // pitch的判断依据
+            //三个flag决定各种方向和类型
+            int terrain_flag = 5;
+            int ang_flag = 0;
+            int pitch_flag = 0;
+            int ang_flag2 = 0;
+            if(abs(angdiff)>deg_max) ang_flag = 1; //角度要调整
+            else ang_flag = 0;
+            if(pitch < pitch_limit) pitch_flag = 2; //在坡上
+            else pitch_flag = 0;
+            if(abs(angdiff)>deg_max2) ang_flag2 = 4;//大于30度了（需要优先调整）
+            else ang_flag2 = 0;
+            terrain_flag = ang_flag + pitch_flag + ang_flag2;
             
-            float pre_aa = pid(pid_n2, dt, pre_avel, Scout_chassis.Robot_velocity.angular.z, angvel_error);
-
+            switch (terrain_flag)
+            {
+                case 0://角度在10度内，不在坡上
+                    v_input = Vtar*1.5;
+                    break;
+                case 1://角度在10度开外，小于60度，不在坡上
+                    v_input = Vtar/2;
+                    break;
+                case 2://角度在10度内，在坡上
+                    v_input = Vtar*1.5;
+                    pid_n2[0] = 200;
+                    break;
+                case 3://角度在10度外，小于60度，在坡上
+                    v_input = Vtar/2;
+                    pid_n2[0] = 200;
+                    break;
+                case 4://角度大于60度，不在坡上
+                    v_input = 0;
+                    break;
+                case 5://角度大于60度，不在坡上
+                    v_input = 0;
+                    break;
+                case 6://角度大于60度，在坡上
+                    v_input = 0;
+                    break;
+                case 7://角度大于60度，在坡上
+                    v_input = 0;
+                    break;
+                default:
+                    v_input = Vtar;
+                    break;
+            }
+            pre_a = pid(pid_n, dt, v_input, Scout_chassis.Robot_velocity.linear.x, vel_error);
+            pre_aa = pid(pid_n2, dt, pre_avel, Scout_chassis.Robot_velocity.angular.z, angvel_error);//角加速度
             if(pre_a > Scout_chassis.acc_max)
             {
                 pre_a = Scout_chassis.acc_max;
@@ -335,20 +370,6 @@ int main(int argc, char *argv[])
     }
     return 0;
     
-}
-
-//对角度作一个修正
-float angle_normalized(float angle)
-{
-    while (angle > M_PI)
-    {
-        angle -= 2 * M_PI;
-    }
-    while (angle < -M_PI)
-    {
-        angle += 2 * M_PI;
-    }
-    return angle;
 }
 
 //获取圆的半径

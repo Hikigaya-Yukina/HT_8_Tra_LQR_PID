@@ -24,6 +24,7 @@ int path_length;
 int path_length_o = 0;
 //角度范围
 float deg_max = 10.0/180.0 * M_PI;
+float deg_max2= 60.0/180.0 * M_PI;
 float deg_min = 3.0/360.0 * M_PI;
 float vel_error =0;
 float angvel_error =0;
@@ -146,8 +147,8 @@ int main(int argc, char *argv[])
             float cmd_lvel = 0;
 
             //预测的速度
-            float pre_avel = 0;
-            float pre_lvel = 0;
+            float pre_avel = 0;//预测角速度
+            float pre_lvel = 0;//预测线速度
             double pre_vel[2];
             //gazebo里的速度
             float line_vel = Scout_chassis.Robot_velocity.linear.x;
@@ -161,7 +162,7 @@ int main(int argc, char *argv[])
 
             //获取参考速度和参考角度
             float ref_vel = Scout_chassis.Vtar;
-            float ref_angle = angle_normalized(theta);
+            float ref_angle = theta;
             float angdiff = angle_normalized(theta - model_yaw);
             //计算 A,B矩阵
             
@@ -203,16 +204,66 @@ int main(int argc, char *argv[])
         
             //用Pid更新角速度和线速度 pitch 上坡是负的
             float pre_a;
-            if(abs(angdiff)>deg_max)//差不多15度
-            {
-                pre_a = pid(pid_n, dt, Vtar/2, Scout_chassis.Robot_velocity.linear.x, vel_error);
-            }//单纯的原地旋转是有问题的。
-            else{
-                pre_a = pid(pid_n, dt, Vtar, Scout_chassis.Robot_velocity.linear.x, vel_error);
-            }
+            float pre_aa;
+            double v_input;
+            float pitch_limit = - 0.175; // pitch的判断依据
+            //三个flag决定各种方向和类型
+            int terrain_flag = 5;
+            int ang_flag = 0;
+            int pitch_flag = 0;
+            int ang_flag2 = 0;
+            if(abs(angdiff)>deg_max) ang_flag = 1; //角度要调整
+            else ang_flag = 0;
+            if(pitch < pitch_limit) pitch_flag = 2; //在坡上
+            else pitch_flag = 0;
+            if(abs(angdiff)>deg_max2) ang_flag2 = 4;//大于30度了（需要优先调整）
+            else ang_flag2 = 0;
+            terrain_flag = ang_flag + pitch_flag + ang_flag2;
             
-            float pre_aa = pid(pid_n2, dt, pre_avel, Scout_chassis.Robot_velocity.angular.z, angvel_error);//角加速度
-
+            switch (terrain_flag)
+            {
+                case 0://角度在10度内，不在坡上
+                    v_input = Vtar;
+                    break;
+                case 1://角度在10度开外，小于60度，不在坡上
+                    v_input = Vtar/2;
+                    break;
+                case 2://角度在10度内，在坡上
+                    v_input = Vtar;
+                    pid_n2[0] = 200;
+                    break;
+                case 3://角度在10度外，小于60度，在坡上
+                    v_input = Vtar/2;
+                    pid_n2[0] = 200;
+                    break;
+                case 4://角度大于60度，不在坡上
+                    v_input = 0;
+                    break;
+                case 5://角度大于60度，不在坡上
+                    v_input = 0;
+                    break;
+                case 6://角度大于60度，在坡上
+                    v_input = 0;
+                    pid_n2[0] = 200;
+                    break;
+                case 7://角度大于60度，在坡上
+                    v_input = 0;
+                    pid_n2[0] = 200;
+                    break;
+                default:
+                    v_input = Vtar;
+                    break;
+            }
+            pre_a = pid(pid_n, dt, v_input, Scout_chassis.Robot_velocity.linear.x, vel_error);
+            pre_aa = pid(pid_n2, dt, pre_avel, Scout_chassis.Robot_velocity.angular.z, angvel_error);//角加速度
+            // if(abs(angdiff)>deg_max)//差不多15度
+            // {
+            //     pre_a = pid(pid_n, dt, Vtar/2, Scout_chassis.Robot_velocity.linear.x, vel_error);
+            // }//单纯的原地旋转是有问题的。
+            // else if{ pitch < -0.175}
+            // else {
+            //     pre_a = pid(pid_n, dt, Vtar, Scout_chassis.Robot_velocity.linear.x, vel_error);
+            // }
             if(pre_a > Scout_chassis.acc_max)
             {
                 pre_a = Scout_chassis.acc_max;

@@ -9,6 +9,19 @@ using namespace Eigen;
 
 constexpr double EPS = 1.0e-4;
 
+float angle_normalized(float angle)
+{
+    while (angle > M_PI)
+    {
+        angle -= 2 * M_PI;
+    }
+    while (angle < -M_PI)
+    {
+        angle += 2 * M_PI;
+    }
+    return angle;
+}
+
 class LQRControl{
 private:
     int N;     // 可能是迭代步长
@@ -38,7 +51,7 @@ public:
     MatrixXd X(3,1);
     X<< robot_state[0] - refer_path[0],
         robot_state[1] - refer_path[1],
-        robot_state[2] - refer_path[2];//  x是当前位置和预瞄点的偏差  x,y,yaw三个偏差
+        angle_normalized(robot_state[2] - refer_path[2]);//  x是当前位置和预瞄点的偏差  x,y,yaw三个偏差
 
     MatrixXd P = calRicatti(A,B,Q,R);    //   3*3
     
